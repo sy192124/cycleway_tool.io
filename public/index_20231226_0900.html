@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parramatta Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <style>
+        /* Make the map container fill the entire screen */
+        #mapid {
+            height: 100vh; /* 100% of the viewport height */
+            width: 100vw; /* 100% of the viewport width */
+        }
+    </style>
+
+    <script>
+        // Function to load GeoJSON data and add it to the map with appropriate styles
+        function loadGeoJson(url, map) {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    L.geoJSON(data, {
+                        // Style each feature (this function is called for each feature in the GeoJSON)
+                        style: function (feature) {
+                            // Check if the feature is a LineString (road)
+                            if (feature.geometry.type === 'LineString') {
+                                return {
+                                    color: "#3388ff", // Set the line color for roads
+                                    weight: 1, // Set the line thickness for roads
+                                    opacity: 0.65 // Set the line opacity for roads
+                                };
+                            }
+                            // Apply default styling for other types of features or specify more conditions as needed
+                        },
+                        pointToLayer: function (feature, latlng) {
+                            // Check if the feature is a Point (location)
+                            if (feature.geometry.type === 'Point') {
+                                return L.circleMarker(latlng, {
+                                    radius: 1, // Radius of the circle marker
+                                    fillColor: "#ff7800", // Fill color of the circle marker
+                                    color: "#000", // Border color of the circle marker
+                                    weight: 1, // Border width of the circle marker
+                                    opacity: 1, // Border opacity of the circle marker
+                                    fillOpacity: 0.8 // Fill opacity of the circle marker
+                                });
+                            }
+                        }
+                    }).addTo(map);
+                })
+                .catch(error => console.error('Error loading GeoJSON: ', error));
+        }
+    </script>
+</head>
+<body>
+    <div id="mapid"></div>
+
+    <script>
+        // Initialize the map and set its view to Parramatta
+        var mymap = L.map('mapid').setView([-33.815, 151.003], 13);
+
+        // Add OpenStreetMap tiles to the map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(mymap);
+
+        // Load and add the GeoJSON to the map as small circle markers for locations
+        loadGeoJson('Pop.json', mymap); // Make sure 'Pop.json' is the correct path to your GeoJSON file
+
+        // Load and add the GeoJSON to the map as thin lines for roads
+        loadGeoJson('Roads.json', mymap); // Make sure 'Roads.json' is the correct path to your GeoJSON file
+    </script>
+</body>
+</html>

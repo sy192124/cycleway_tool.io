@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parramatta Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <!-- Include PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+    <style>
+        /* Make the map container fill the entire screen */
+        #mapid {
+            height: 90vh; /* 100% of the viewport height */
+            width: 90vw; /* 100% of the viewport width */
+        }
+        .info.legend {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            line-height: 18px;
+            color: #555;
+        }
+        .info.legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        .visible-button {
+            background-color: green; /* Change to your desired color */
+        }
+    </style>
+</head>
+<body>
+    <div id="mapid"></div>
+
+    <!-- Add buttons for each Rank -->
+    <button id="toggleRank1" onclick="toggleLayer(1)">Rank 1</button>
+    <button id="toggleRank2" onclick="toggleLayer(2)">Rank 2</button>
+    <button id="toggleRank3" onclick="toggleLayer(3)">Rank 3</button>
+    <button id="toggleRank4" onclick="toggleLayer(4)">Rank 4</button>
+    <button id="toggleRank5" onclick="toggleLayer(5)">Rank 5</button>
+    <button id="toggleRank6" onclick="toggleLayer(6)">Rank 6</button>
+    <button id="toggleRank7" onclick="toggleLayer(7)">Rank 7</button>
+    <button id="toggleRank8" onclick="toggleLayer(8)">Rank 8</button>
+    <button id="toggleRank9" onclick="toggleLayer(9)">Rank 9</button>
+    <button id="toggleRank10" onclick="toggleLayer(10)">Rank 10</button>
+
+    <!-- Add a button for Existing Cycleways -->
+    <button id="toggleCycleways" onclick="toggleCycleways()">Existing Cycleways</button>
+
+    <script>
+        // Initialize the map and set its view to Parramatta
+        var mymap = L.map('mapid').setView([-33.815, 151.003], 12);
+
+        // Add CartoDB Positron tiles to the map
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors, © CARTO'
+        }).addTo(mymap);
+
+        // Object to store the color for each rank (row in CSV)
+        var rankColors = {};
+
+        // Object to store GeoJSON layers by Rank
+        var rankLayers = {};
+
+        // Helper function to generate a random color
+        function getRandomColor() {
+            var letters = '0123456789ABCDEF';
+            var color = '#';
+            for (var i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // Function to toggle visibility of a layer by Rank
+        function toggleLayer(rank) {
+            var layer = rankLayers[rank];
+            if (layer) {
+                if (mymap.hasLayer(layer)) {
+                    mymap.removeLayer(layer);
+                    // Remove the 'visible-button' class to change the button color
+                    document.getElementById(`toggleRank${rank}`).classList.remove('visible-button');
+                } else {
+                    mymap.addLayer(layer);
+                    // Add the 'visible-button' class to change the button color
+                    document.getElementById(`toggleRank${rank}`).classList.add('visible-button');
+                }
+            }
+        }
+
+        // Create a layer group for cycleways (global variable)
+        var cyclewaysLayer = L.layerGroup();
+
+        // Function to toggle visibility of Existing Cycleways
+        function toggleCycleways() {
+            if (mymap.hasLayer(cyclewaysLayer)) {
+                mymap.removeLayer(cyclewaysLayer);
+                // Remove the 'visible-button' class to change the button color
+                document.getElementById('toggleCycleways').classList.remove('visible-button');
+            } else {
+                mymap.addLayer(cyclewaysLayer);
+                // Add the 'visible-button' class to change the button color
+                document.getElementById('toggleCycleways').classList.add('visible-button');
+            }
+        }
+
+        // Function to load and display features from the GeoJSON file
+        function displayFeatures(csvFilePath, geoJsonFilePath, map) {
+            Papa.parse(csvFilePath, {
+                download: true,
+                header: true,
+                complete: function (csvResults) {
+                    fetch(geoJsonFilePath)
+                        .then(response => response.json())
+                        .then(geoJsonData => {
+                            // Now, loop through the GeoJSON features to find and add cycleways
+                            geoJsonData.features.forEach(feature => {
+                                if (feature.properties.fclass === "cycleway") {
+                                    L.geoJSON(feature, {
+                                        style: {
+                                            color: "#000000", // Color for cycleways; change as needed
+                                            weight: 2,
+                                            opacity: 1
+                                        }
+                                    }).addTo(cyclewaysLayer);
+                                }
+                            });
+
+                            // Loop through each row in the CSV
+                            csvResults.data.forEach((row, index) => {
+                                // Assign a color for this rank
+                                let color = getRandomColor();
+                                // Store the color associated with the rank
+                                rankColors[index + 1] = color;
+
+                                // Create a GeoJSON layer for this rank
+                                let geoJsonLayer = L.geoJSON(null, {
+                                    style: {
+                                        color: color,
+                                        weight: 3,
+                                        opacity: 0.75
+                                    }
+                                });
+
+                                // Loop through each FID in the row
+                                Object.entries(row).forEach(([fid, objectId]) => {
+                                    if (fid.startsWith('FID')) {
+                                        let feature = geoJsonData.features.find(f => f.properties.OBJECTID_1 === parseInt(objectId, 10));
+                                        if (feature) {
+                                            // Add the feature to the GeoJSON layer
+                                            geoJsonLayer.addData(feature);
+                                        }
+                                    }
+                                });
+
+                                // Store the GeoJSON layer by Rank
+                                rankLayers[index + 1] = geoJsonLayer;
+                            });
+
+                            // Add the legend after processing all ranks
+                            addLegend(map);
+                        })
+                        .catch(error => console.error('Error loading GeoJSON:', error));
+                }
+            });
+        }
+
+        // Function to add a legend to the map
+        function addLegend(map) {
+            var legend = L.control({ position: 'bottomright' });
+
+            legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'info legend');
+                var labels = ['<strong>Legend</strong>'];
+
+                // Create a label for each rank color
+                Object.keys(rankColors).forEach(rank => {
+                    labels.push(
+                        '<i style="background:' + rankColors[rank] + ';"></i> ' +
+                        'Rank ' + rank
+                    );
+                });
+
+                // Add a row for cycleways (assuming you want it to be black)
+                labels.push(
+                    '<i style="background:#000000;"></i> ' +
+                    'Existing Cycleways'
+                );
+
+                div.innerHTML = labels.join('<br>');
+                return div;
+            };
+
+            legend.addTo(map);
+        }
+
+        // Call the displayFeatures function with paths to your CSV and GeoJSON files
+        displayFeatures('2km_top_10_cycleways_until_iteration_19200.csv', 'Roads.json', mymap);
+
+    </script>
+</body>
+</html>
